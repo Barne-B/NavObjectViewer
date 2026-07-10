@@ -16,6 +16,37 @@ public sealed class EnumMatchConverter : IValueConverter
             : Binding.DoNothing;
 }
 
+/// <summary>Friendly display labels for the search-scope enum.</summary>
+public sealed class SearchScopeLabelConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value?.ToString() switch
+        {
+            "All" => "All objects",
+            "Filtered" => "Current filter",
+            "CustomRange" => "Custom range (≥ 50000)",
+            _ => value?.ToString() ?? string.Empty,
+        };
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
+/// <summary>Int 0 → Visible, non-zero → Collapsed. Pass ConverterParameter="invert" to flip.</summary>
+public sealed class CountToVisibilityConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        bool isZero = value is int i ? i == 0 : true;
+        if (string.Equals(parameter as string, "invert", StringComparison.OrdinalIgnoreCase))
+            isZero = !isZero;
+        return isZero ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Binding.DoNothing;
+}
+
 /// <summary>True → Visible, False → Collapsed. Pass ConverterParameter="invert" to flip.</summary>
 public sealed class BoolToVisibilityConverter : IValueConverter
 {

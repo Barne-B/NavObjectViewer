@@ -11,6 +11,9 @@ public partial class App : Application
         // CP850 (OEM) codepage is not built into .NET Core — register the provider once.
         Encodings.Register();
 
+        // Apply the persisted light/dark theme before the main window is created.
+        ThemeManager.Initialize();
+
         // Never let an unexpected failure silently kill the app; log it and tell the user.
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

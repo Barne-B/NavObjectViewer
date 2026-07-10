@@ -4,53 +4,88 @@
         xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
         xmlns:local="clr-namespace:NavObjectViewer"
         xmlns:vm="clr-namespace:NavObjectViewer.ViewModels"
-        Title="NAV Object Viewer" Height="760" Width="1240"
-        WindowStartupLocation="CenterScreen">
+        Title="NAV Object Viewer" Height="800" Width="1320"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBg}"
+        Foreground="{DynamicResource TextPrimary}"
+        FontFamily="{StaticResource Font.UI}" FontSize="13"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType">
 
     <Window.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <local:CountToVisibilityConverter x:Key="CountToVis" />
+        <local:SearchScopeLabelConverter x:Key="ScopeLabel" />
     </Window.Resources>
 
-    <DockPanel>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <!-- Top toolbar -->
-        <ToolBarTray DockPanel.Dock="Top">
-            <ToolBar>
-                <Button Content="Open File…" Command="{Binding OpenFileCommand}" Padding="10,3" />
-                <Button Content="Open Folder…" Command="{Binding OpenFolderCommand}" Padding="10,3" />
-                <Separator />
-                <TextBlock Text="{Binding SourceLabel}" VerticalAlignment="Center" Margin="8,0"
-                           Foreground="#FF666666" />
-            </ToolBar>
-        </ToolBarTray>
+        <!-- ============ App bar ============ -->
+        <Border Grid.Row="0" Background="{DynamicResource BarBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
+            <Grid Margin="18,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
 
-        <!-- Status bar -->
-        <StatusBar DockPanel.Dock="Bottom">
-            <StatusBarItem>
-                <TextBlock Text="{Binding StatusText}" />
-            </StatusBarItem>
-            <StatusBarItem>
-                <ProgressBar Width="160" Height="12" Minimum="0" Maximum="1" Value="{Binding Progress}"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
-            </StatusBarItem>
-            <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock>
-                    <Run Text="Total: " /><Run Text="{Binding TotalCount, Mode=OneWay, StringFormat=N0}" />
-                    <Run Text="   Shown: " /><Run Text="{Binding VisibleCount, Mode=OneWay, StringFormat=N0}" />
-                    <Run Text="   Selected: " /><Run Text="{Binding CheckedCount, Mode=OneWay, StringFormat=N0}" FontWeight="Bold" />
-                </TextBlock>
-            </StatusBarItem>
-        </StatusBar>
+                <!-- brand -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Height="58">
+                    <Rectangle Width="16" Height="16" RadiusX="3" RadiusY="3" Fill="{DynamicResource Accent}"
+                               RenderTransformOrigin="0.5,0.5">
+                        <Rectangle.RenderTransform>
+                            <RotateTransform Angle="45" />
+                        </Rectangle.RenderTransform>
+                    </Rectangle>
+                    <TextBlock Text="NAV Object Viewer" FontFamily="{StaticResource Font.Display}"
+                               FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"
+                               VerticalAlignment="Center" Margin="12,0,0,0" />
+                </StackPanel>
 
-        <!-- Main content -->
-        <Grid Margin="6">
+                <!-- source -->
+                <Border Grid.Column="1" Style="{StaticResource Chip}" VerticalAlignment="Center" Margin="16,0,0,0"
+                        Visibility="{Binding SourceLabel, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding SourceLabel}" Foreground="{DynamicResource TextSecondary}"
+                               FontFamily="{StaticResource Font.Mono}" FontSize="11.5" />
+                </Border>
+
+                <!-- actions -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="ThemeToggleButton" Style="{StaticResource GhostButton}" Click="ThemeToggle_Click"
+                            Padding="9,7" Margin="0,0,6,0">
+                        <TextBlock x:Name="ThemeGlyph" FontFamily="{StaticResource Font.Icon}" FontSize="15" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding OpenFileCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE8E5;" FontSize="15" VerticalAlignment="Center" />
+                            <TextBlock Text="Open File" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource GhostButton}" Command="{Binding OpenFolderCommand}" Margin="4,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE8B7;" FontSize="15" VerticalAlignment="Center" />
+                            <TextBlock Text="Open Folder" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ============ Content ============ -->
+        <Grid Grid.Row="1" Margin="14,14,14,10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.3*" MinWidth="520" />
-                <ColumnDefinition Width="4" />
-                <ColumnDefinition Width="1*" MinWidth="360" />
+                <ColumnDefinition Width="1.35*" MinWidth="560" />
+                <ColumnDefinition Width="14" />
+                <ColumnDefinition Width="1*" MinWidth="380" />
             </Grid.ColumnDefinitions>
 
-            <!-- LEFT: filters + grid + selection bar -->
+            <!-- LEFT -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -58,170 +93,291 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- Filters -->
-                <GroupBox Grid.Row="0" Header="Filters" Margin="2">
-                    <StackPanel Margin="4">
-                        <ItemsControl ItemsSource="{Binding TypeToggles}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsEnabled}"
-                                              Margin="0,0,12,4" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <WrapPanel Margin="0,4,0,0">
-                            <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Width="180" Text="{Binding FilterName, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Substring, or wildcard with * and ?" Margin="0,0,12,4" />
-                            <TextBlock Text="ID from:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Width="70" Text="{Binding FilterIdMin, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,6,4" />
-                            <TextBlock Text="to:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Width="70" Text="{Binding FilterIdMax, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,12,4" />
-                            <TextBlock Text="Version:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <TextBox Width="120" Text="{Binding FilterVersion, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,12,4" />
+                <!-- Filters card -->
+                <Border Grid.Row="0" Style="{StaticResource Card}" Padding="12,9" Margin="0,0,0,10">
+                    <StackPanel>
+                        <WrapPanel>
+                            <ItemsControl ItemsSource="{Binding TypeToggles}" Margin="0,0,4,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsEnabled}" Margin="0,3,14,3" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </WrapPanel>
 
-                        <WrapPanel Margin="0,2,0,0">
-                            <CheckBox Content="Modified only" IsChecked="{Binding ShowModifiedOnly}" Margin="0,0,12,0" VerticalAlignment="Center" />
-                            <CheckBox Content="Anomalous only" IsChecked="{Binding ShowAnomalousOnly}" Margin="0,0,16,0" VerticalAlignment="Center" />
-                            <Button Content="Custom range ≥50000" Command="{Binding PresetCustomRangeCommand}" Margin="0,0,8,0" Padding="8,2" />
-                            <Button Content="Clear filters" Command="{Binding ClearFiltersCommand}" Padding="8,2" />
-                        </WrapPanel>
+                        <Border Height="1" Background="{DynamicResource LineSoft}" Margin="0,7,0,9" />
 
-                        <Border Background="#22007ACC" BorderBrush="#55007ACC" BorderThickness="1" CornerRadius="3"
-                                Padding="6,2" Margin="0,6,0,0" HorizontalAlignment="Left"
-                                Visibility="{Binding ContentFilterActive, Converter={StaticResource BoolToVis}}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="{Binding ContentFilterLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                                <Button Content="✕ Clear content filter" Command="{Binding ClearContentFilterCommand}" Padding="6,1" />
+                        <WrapPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                                <TextBlock Text="Name" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Width="150" Text="{Binding FilterName, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Substring, or wildcard with * and ?" />
                             </StackPanel>
-                        </Border>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                                <TextBlock Text="ID" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Width="66" Text="{Binding FilterIdMin, UpdateSourceTrigger=PropertyChanged}"
+                                         FontFamily="{StaticResource Font.Mono}" ToolTip="Minimum ID" />
+                                <TextBlock Text="—" Foreground="{DynamicResource TextMuted}" VerticalAlignment="Center" Margin="7,0" />
+                                <TextBox Width="66" Text="{Binding FilterIdMax, UpdateSourceTrigger=PropertyChanged}"
+                                         FontFamily="{StaticResource Font.Mono}" ToolTip="Maximum ID" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                                <TextBlock Text="Version" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <TextBox Width="110" Text="{Binding FilterVersion, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Version list contains…" />
+                            </StackPanel>
+                        </WrapPanel>
+
+                        <WrapPanel Margin="0,9,0,0">
+                            <CheckBox Content="Modified only" IsChecked="{Binding ShowModifiedOnly}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                            <CheckBox Content="Anomalous only" IsChecked="{Binding ShowAnomalousOnly}" Margin="0,0,18,0" VerticalAlignment="Center" />
+                            <Button Style="{StaticResource GhostButton}" Content="≥ 50000" Command="{Binding PresetCustomRangeCommand}"
+                                    Margin="0,0,4,0" ToolTip="Custom object range (ID ≥ 50000)" />
+                            <Button Style="{StaticResource GhostButton}" Content="Clear" Command="{Binding ClearFiltersCommand}"
+                                    ToolTip="Clear all filters" />
+                            <Border Style="{StaticResource Chip}" Margin="10,0,0,0" VerticalAlignment="Center"
+                                    Background="#22E4A84C" BorderBrush="#55E4A84C"
+                                    Visibility="{Binding ContentFilterActive, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE71C;" FontSize="11"
+                                               Foreground="{DynamicResource Accent}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                                    <TextBlock Text="{Binding ContentFilterLabel}" Foreground="{DynamicResource TextPrimary}"
+                                               VerticalAlignment="Center" Margin="0,0,8,0" FontSize="12" />
+                                    <Button Style="{StaticResource GhostButton}" Command="{Binding ClearContentFilterCommand}"
+                                            Padding="5,1" Content="✕" Foreground="{DynamicResource Accent}" />
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
                     </StackPanel>
-                </GroupBox>
+                </Border>
 
-                <!-- Object grid -->
-                <DataGrid Grid.Row="1" Margin="2" ItemsSource="{Binding RowsView}"
-                          SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False"
-                          IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
-                          SelectionMode="Extended" GridLinesVisibility="Horizontal"
-                          EnableRowVirtualization="True" HeadersVisibility="Column"
-                          x:Name="ObjectsGrid">
-                    <DataGrid.Columns>
-                        <DataGridTemplateColumn Header="✓" Width="30" CanUserSort="False">
-                            <DataGridTemplateColumn.CellTemplate>
-                                <DataTemplate>
-                                    <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                                              HorizontalAlignment="Center" />
-                                </DataTemplate>
-                            </DataGridTemplateColumn.CellTemplate>
-                        </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="" Binding="{Binding Flag}" Width="24" IsReadOnly="True" />
-                        <DataGridTextColumn Header="Type" Binding="{Binding TypeName}" Width="80" IsReadOnly="True" />
-                        <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="70" IsReadOnly="True" />
-                        <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" IsReadOnly="True" />
-                        <DataGridTextColumn Header="Version List" Binding="{Binding VersionList}" Width="130" IsReadOnly="True" />
-                        <DataGridCheckBoxColumn Header="Mod" Binding="{Binding Modified, Mode=OneWay}" Width="44" IsReadOnly="True" />
-                        <DataGridTextColumn Header="Date" Binding="{Binding Date}" Width="80" IsReadOnly="True" />
-                        <DataGridTextColumn Header="Source" Binding="{Binding SourceFileName}" Width="120" IsReadOnly="True" />
-                    </DataGrid.Columns>
-                </DataGrid>
+                <!-- Object grid card -->
+                <Border Grid.Row="1" Style="{StaticResource Card}" Padding="0" ClipToBounds="True">
+                    <Grid>
+                        <DataGrid Margin="6,6,6,6" ItemsSource="{Binding RowsView}"
+                                  SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
+                                  CanUserResizeColumns="True" CanUserReorderColumns="True"
+                                  SelectionMode="Extended" x:Name="ObjectsGrid">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Header="&#x2713;" Width="48" MinWidth="40" CanUserSort="False">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                                                      HorizontalAlignment="Center" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="" Binding="{Binding Flag}" Width="30" MinWidth="26" IsReadOnly="True" CanUserResize="False">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                                            <Setter Property="VerticalAlignment" Value="Center" />
+                                            <Setter Property="HorizontalAlignment" Value="Center" />
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="TYPE" Binding="{Binding TypeName}" Width="88" MinWidth="64" IsReadOnly="True" />
+                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="74" MinWidth="56" IsReadOnly="True"
+                                                    ElementStyle="{StaticResource MonoCell}" />
+                                <DataGridTextColumn Header="NAME" Binding="{Binding Name}" Width="*" MinWidth="120" IsReadOnly="True" />
+                                <DataGridTextColumn Header="VERSION" Binding="{Binding VersionList}" Width="130" MinWidth="80" IsReadOnly="True"
+                                                    ElementStyle="{StaticResource MonoCell}" />
+                                <DataGridCheckBoxColumn Header="MOD" Binding="{Binding Modified, Mode=OneWay}" Width="54" MinWidth="44" IsReadOnly="True" />
+                                <DataGridTextColumn Header="DATE" Binding="{Binding Date}" Width="92" MinWidth="70" IsReadOnly="True"
+                                                    ElementStyle="{StaticResource MonoCell}" />
+                            </DataGrid.Columns>
+                        </DataGrid>
 
-                <!-- Selection bar -->
-                <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="2,4">
-                    <Button Content="Check shown" Command="{Binding CheckVisibleCommand}" Padding="8,3" Margin="0,0,6,0" />
-                    <Button Content="Invert shown" Command="{Binding InvertVisibleCommand}" Padding="8,3" Margin="0,0,6,0" />
-                    <Button Content="Clear selection" Command="{Binding UncheckAllCommand}" Padding="8,3" Margin="0,0,6,0" />
-                    <Button Content="Export selected…" Padding="12,3"
-                            FontWeight="SemiBold" Margin="16,0,0,0" x:Name="ExportButton" Click="ExportButton_Click" />
-                </StackPanel>
+                        <!-- Empty state -->
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="360"
+                                    Visibility="{Binding TotalCount, Converter={StaticResource CountToVis}}">
+                            <Border Width="72" Height="72" CornerRadius="18" Background="{DynamicResource SurfaceAlt}"
+                                    BorderBrush="{DynamicResource Line}" BorderThickness="1" HorizontalAlignment="Center">
+                                <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE8A5;" FontSize="30"
+                                           Foreground="{DynamicResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock Text="No objects loaded" FontFamily="{StaticResource Font.Display}" FontSize="17"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"
+                                       HorizontalAlignment="Center" Margin="0,18,0,6" />
+                            <TextBlock TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}"
+                                       Text="Open a C/AL object export (.txt) or a folder of exports to browse, search and re-export objects." />
+                            <Button Style="{StaticResource PrimaryButton}" Command="{Binding OpenFileCommand}"
+                                    HorizontalAlignment="Center" Margin="0,18,0,0" Padding="16,9">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE8E5;" FontSize="14" VerticalAlignment="Center" />
+                                    <TextBlock Text="Open File" Margin="8,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Action bar -->
+                <Grid Grid.Row="2" Margin="0,12,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Check shown" Command="{Binding CheckVisibleCommand}" Margin="0,0,8,0" />
+                        <Button Content="Invert" Command="{Binding InvertVisibleCommand}" Margin="0,0,8,0" />
+                        <Button Content="Clear selection" Command="{Binding UncheckAllCommand}" />
+                    </StackPanel>
+                    <Button HorizontalAlignment="Right" Style="{StaticResource PrimaryButton}" Padding="16,8"
+                            x:Name="ExportButton" Click="ExportButton_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE74E;" FontSize="14" VerticalAlignment="Center" />
+                            <TextBlock Text="Export selected" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
             </Grid>
 
-            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="#22000000" />
+            <GridSplitter Grid.Column="1" Width="14" HorizontalAlignment="Center" VerticalAlignment="Stretch" />
 
-            <!-- RIGHT: viewer + search tabs -->
-            <TabControl Grid.Column="2" Margin="2">
-                <TabItem Header="Viewer">
-                    <DockPanel>
-                        <Border DockPanel.Dock="Top" Background="#11000000" Padding="6">
-                            <TextBlock Text="{Binding ViewerHeader}" FontFamily="Consolas" TextTrimming="CharacterEllipsis" />
-                        </Border>
-                        <avalonEdit:TextEditor x:Name="Editor" IsReadOnly="True" ShowLineNumbers="True"
-                                               FontFamily="Consolas" FontSize="12" WordWrap="False"
-                                               HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
-                    </DockPanel>
-                </TabItem>
+            <!-- RIGHT -->
+            <Border Grid.Column="2" Style="{StaticResource Card}" Padding="4">
+                <TabControl>
+                    <TabItem Header="Viewer">
+                        <Grid Margin="8,4,8,8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="{DynamicResource SurfaceAlt}" BorderBrush="{DynamicResource Line}"
+                                    BorderThickness="1" CornerRadius="8" Padding="12,8" Margin="0,0,0,8">
+                                <TextBlock Text="{Binding ViewerHeader}" FontFamily="{StaticResource Font.Mono}" FontSize="12"
+                                           Foreground="{DynamicResource TextSecondary}" TextTrimming="CharacterEllipsis" />
+                            </Border>
+                            <Border Grid.Row="1" Background="{DynamicResource EditorBg}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                                    CornerRadius="8" ClipToBounds="True">
+                                <avalonEdit:TextEditor x:Name="Editor" IsReadOnly="True" ShowLineNumbers="True"
+                                                       FontFamily="{StaticResource Font.Mono}" FontSize="12.5" WordWrap="False"
+                                                       Background="{DynamicResource EditorBg}" Foreground="{DynamicResource EditorFg}"
+                                                       LineNumbersForeground="{DynamicResource EditorLineNr}" Padding="8,6"
+                                                       HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" />
+                            </Border>
+                        </Grid>
+                    </TabItem>
 
-                <TabItem Header="Search">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
+                    <TabItem Header="Search">
+                        <Grid Margin="8,4,8,8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Margin="4">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                                         VerticalContentAlignment="Center" Padding="4"
-                                         KeyDown="SearchBox_KeyDown" />
-                                <Button Grid.Column="1" Content="Search" Command="{Binding SearchCommand}"
-                                        Padding="14,4" Margin="6,0,0,0" />
-                            </Grid>
-                            <WrapPanel Margin="0,6,0,0">
-                                <CheckBox Content="Ignore case" IsChecked="{Binding SearchIgnoreCase}" Margin="0,0,12,0" VerticalAlignment="Center" />
-                                <CheckBox Content="Regex" IsChecked="{Binding SearchUseRegex}" Margin="0,0,16,0" VerticalAlignment="Center" />
-                                <TextBlock Text="Scope:" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                <ComboBox ItemsSource="{Binding SearchScopes}" SelectedItem="{Binding SearchScope}" Width="120" Margin="0,0,16,0" />
-                                <Button Content="Filter list to matches" Command="{Binding FilterGridToMatchesCommand}"
-                                        Padding="8,2" ToolTip="Show only the matching objects in the object list on the left" />
-                            </WrapPanel>
-                            <TextBlock Text="Double-click an object to open it; expand it to see the matching lines, then double-click a line to jump there."
-                                       Foreground="#FF888888" TextWrapping="Wrap" Margin="0,6,0,0" />
-                        </StackPanel>
+                            <StackPanel Grid.Row="0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                             KeyDown="SearchBox_KeyDown" />
+                                    <Button Grid.Column="1" Style="{StaticResource PrimaryButton}" Command="{Binding SearchCommand}"
+                                            Margin="8,0,0,0" Padding="16,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock FontFamily="{StaticResource Font.Icon}" Text="&#xE721;" FontSize="13" VerticalAlignment="Center" />
+                                            <TextBlock Text="Search" Margin="7,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <WrapPanel Margin="0,10,0,4">
+                                    <CheckBox Content="Ignore case" IsChecked="{Binding SearchIgnoreCase}" Margin="0,0,16,6" VerticalAlignment="Center" />
+                                    <CheckBox Content="Regex" IsChecked="{Binding SearchUseRegex}" Margin="0,0,16,6" VerticalAlignment="Center" />
+                                    <TextBlock Text="Scope" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,6" />
+                                    <ComboBox ItemsSource="{Binding SearchScopes}" SelectedItem="{Binding SearchScope}" Width="176" Margin="0,0,12,6">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Converter={StaticResource ScopeLabel}}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Content="Filter list to matches" Command="{Binding FilterGridToMatchesCommand}" Margin="0,0,0,6"
+                                            ToolTip="Show only the matching objects in the object list on the left" />
+                                </WrapPanel>
+                                <TextBlock Foreground="{DynamicResource TextMuted}" TextWrapping="Wrap" FontSize="12" Margin="0,2,0,10"
+                                           Text="Results are grouped by object. Expand an object to load its matching lines, then double-click a line to jump there." />
+                            </StackPanel>
 
-                        <TreeView Grid.Row="1" Margin="4" ItemsSource="{Binding SearchNodes}"
-                                  x:Name="ResultsTree" MouseDoubleClick="ResultsTree_MouseDoubleClick"
-                                  VirtualizingStackPanel.IsVirtualizing="True"
-                                  VirtualizingStackPanel.VirtualizationMode="Recycling">
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="TreeViewItem">
-                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type vm:SearchNodeViewModel}" ItemsSource="{Binding Children}">
-                                    <TextBlock Text="{Binding Header}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsObject}" Value="True">
-                                                        <Setter Property="FontWeight" Value="SemiBold" />
-                                                    </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsObject}" Value="False">
-                                                        <Setter Property="FontFamily" Value="Consolas" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                        </TreeView>
+                            <Border Grid.Row="1" Background="{DynamicResource EditorBg}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8">
+                                <TreeView Margin="4" ItemsSource="{Binding SearchNodes}" Background="Transparent"
+                                          x:Name="ResultsTree" MouseDoubleClick="ResultsTree_MouseDoubleClick"
+                                          VirtualizingStackPanel.IsVirtualizing="True"
+                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                    <TreeView.Resources>
+                                        <HierarchicalDataTemplate DataType="{x:Type vm:SearchNodeViewModel}" ItemsSource="{Binding Children}">
+                                            <TextBlock Text="{Binding Header}" TextTrimming="CharacterEllipsis">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsObject}" Value="True">
+                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimary}" />
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsObject}" Value="False">
+                                                                <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
+                                                                <Setter Property="FontSize" Value="12" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.Resources>
+                                </TreeView>
+                            </Border>
 
-                        <TextBlock Grid.Row="2" Margin="4,2" Text="{Binding SearchStatus}" Foreground="#FF666666" />
-                    </Grid>
-                </TabItem>
-            </TabControl>
+                            <TextBlock Grid.Row="2" Margin="2,8,2,0" Text="{Binding SearchStatus}" Foreground="{DynamicResource TextMuted}" FontSize="12" />
+                        </Grid>
+                    </TabItem>
+                </TabControl>
+            </Border>
         </Grid>
-    </DockPanel>
+
+        <!-- ============ Status bar ============ -->
+        <Border Grid.Row="2" Background="{DynamicResource BarBg}" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+            <Grid Margin="18,0" Height="40">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Foreground="{DynamicResource TextSecondary}"
+                           VerticalAlignment="Center" FontSize="12.5" />
+
+                <ProgressBar Grid.Column="1" Width="180" HorizontalAlignment="Left" Margin="16,0" VerticalAlignment="Center"
+                             Minimum="0" Maximum="1" Value="{Binding Progress}"
+                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,18,0">
+                        <TextBlock Text="TOTAL" Style="{StaticResource SectionLabel}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding TotalCount, Mode=OneWay, StringFormat=N0}" FontFamily="{StaticResource Font.Mono}"
+                                   Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,18,0">
+                        <TextBlock Text="SHOWN" Style="{StaticResource SectionLabel}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                        <TextBlock Text="{Binding VisibleCount, Mode=OneWay, StringFormat=N0}" FontFamily="{StaticResource Font.Mono}"
+                                   Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Border Style="{StaticResource Chip}" Background="#22E4A84C" BorderBrush="#55E4A84C">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="SELECTED" Style="{StaticResource SectionLabel}" Foreground="{DynamicResource Accent}"
+                                       VerticalAlignment="Center" Margin="0,0,7,0" />
+                            <TextBlock Text="{Binding CheckedCount, Mode=OneWay, StringFormat=N0}" FontFamily="{StaticResource Font.Mono}"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>

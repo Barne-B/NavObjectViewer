@@ -4,6 +4,8 @@ using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
 using System.Xml;
 using ICSharpCode.AvalonEdit.Highlighting;
 using ICSharpCode.AvalonEdit.Highlighting.Xshd;
@@ -18,6 +20,10 @@ public partial class MainWindow : Window
     private const int LargeTextThreshold = 1_000_000;
     private const int LongLineThreshold = 5_000;
 
+    // Segoe Fluent Icons glyphs.
+    private static readonly string GlyphSun = char.ConvertFromUtf32(0xE706);   // shown in dark theme (click → light)
+    private static readonly string GlyphMoon = char.ConvertFromUtf32(0xE708);  // shown in light theme (click → dark)
+
     private readonly MainViewModel _vm;
     private IHighlightingDefinition? _calHighlighting;
 
@@ -28,11 +34,60 @@ public partial class MainWindow : Window
         DataContext = _vm;
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         LoadHighlighting();
+        UpdateThemeGlyph();
         Loaded += OnLoaded;
+        SourceInitialized += (_, _) => ApplyTitleBar();
+        ThemeManager.Changed += OnThemeChanged;
+        _vm.SearchCompleted += ScrollResultsToTop;
+    }
+
+    // After results repopulate, reset the tree's scroll to the top (Clear+Add keeps the
+    // old offset, which otherwise clamps to the bottom of the new, shorter result set).
+    private void ScrollResultsToTop()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (FindDescendant<ScrollViewer>(ResultsTree) is { } sv)
+                sv.ScrollToTop();
+        }), DispatcherPriority.Background);
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        int count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(root, i);
+            if (child is T match)
+                return match;
+            if (FindDescendant<T>(child) is { } deeper)
+                return deeper;
+        }
+        return null;
+    }
+
+    private void ApplyTitleBar()
+        => NativeTheme.ApplyTitleBarTheme(this, ThemeManager.Current == ThemeManager.Mode.Dark);
+
+    private void OnThemeChanged()
+    {
+        LoadHighlighting();
+        UpdateThemeGlyph();
+        ApplyTitleBar();
+        if (_vm.SelectedRow is not null)
+            SetViewerText(_vm.ViewerText); // reapply so syntax colours match the new theme
+    }
+
+    private void ThemeToggle_Click(object sender, RoutedEventArgs e) => ThemeManager.Toggle();
+
+    private void UpdateThemeGlyph()
+    {
+        bool dark = ThemeManager.Current == ThemeManager.Mode.Dark;
+        ThemeGlyph.Text = dark ? GlyphSun : GlyphMoon;
+        ThemeToggleButton.ToolTip = dark ? "Switch to light theme" : "Switch to dark theme";
     }
 
     // Command-line auto-open: NavObjectViewer.exe "<path>" [--select-first] [--select-largest] [--search <term>]
-    // Used for headless reproduction and as an "open with" convenience.
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         string[] cli = Environment.GetCommandLineArgs();
@@ -50,7 +105,6 @@ public partial class MainWindow : Window
             if (cli.Contains("--select-first") && _vm.RowsView is not null)
                 _vm.SelectedRow = _vm.RowsView.Cast<ObjectRowViewModel>().FirstOrDefault();
 
-            // Verification hook: open the largest object (usually a Report with big RDLDATA).
             if (cli.Contains("--select-largest") && _vm.RowsView is not null)
                 _vm.SelectedRow = _vm.RowsView.Cast<ObjectRowViewModel>()
                     .OrderByDescending(r => r.Model.ByteLength).FirstOrDefault();
@@ -62,7 +116,7 @@ public partial class MainWindow : Window
                 _vm.SearchQuery = cli[si + 1];
                 await _vm.SearchCommand.ExecuteAsync(null);
                 if (_vm.SearchNodes.Count > 0)
-                    _vm.SearchNodes[0].IsExpanded = true; // force lazy child load + tree render
+                    _vm.SearchNodes[0].IsExpanded = true;
             }
         }
         catch (Exception ex)
@@ -75,8 +129,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            using Stream? stream = Assembly.GetExecutingAssembly()
-                .GetManifestResourceStream("NavObjectViewer.Highlighting.CAL.xshd");
+            string resource = ThemeManager.Current == ThemeManager.Mode.Light
+                ? "NavObjectViewer.Highlighting.CAL.Light.xshd"
+                : "NavObjectViewer.Highlighting.CAL.xshd";
+
+            using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource);
             if (stream is null)
                 return;
 

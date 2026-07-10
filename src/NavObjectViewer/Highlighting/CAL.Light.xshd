@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="CAL-Light" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment"  foreground="#FF2E7D32" />
+  <Color name="String"   foreground="#FFA31515" />
+  <Color name="Keyword"  foreground="#FF0033B3" fontWeight="bold" />
+  <Color name="Type"     foreground="#FF167F8C" />
+  <Color name="Number"   foreground="#FF098658" />
+  <Color name="Property" foreground="#FF7A3E9D" />
+
+  <RuleSet ignoreCase="true">
+
+    <Span color="Comment" multiline="false">
+      <Begin>//</Begin>
+    </Span>
+
+    <Span color="String" multiline="false">
+      <Begin>'</Begin>
+      <End>'</End>
+    </Span>
+
+    <Keywords color="Keyword">
+      <Word>OBJECT</Word>
+      <Word>BEGIN</Word>
+      <Word>END</Word>
+      <Word>VAR</Word>
+      <Word>PROCEDURE</Word>
+      <Word>LOCAL</Word>
+      <Word>IF</Word>
+      <Word>THEN</Word>
+      <Word>ELSE</Word>
+      <Word>EXIT</Word>
+      <Word>REPEAT</Word>
+      <Word>UNTIL</Word>
+      <Word>WHILE</Word>
+      <Word>DO</Word>
+      <Word>FOR</Word>
+      <Word>TO</Word>
+      <Word>DOWNTO</Word>
+      <Word>CASE</Word>
+      <Word>OF</Word>
+      <Word>WITH</Word>
+      <Word>NOT</Word>
+      <Word>AND</Word>
+      <Word>OR</Word>
+      <Word>XOR</Word>
+      <Word>DIV</Word>
+      <Word>MOD</Word>
+      <Word>IN</Word>
+      <Word>TRUE</Word>
+      <Word>FALSE</Word>
+      <Word>ERROR</Word>
+      <Word>MESSAGE</Word>
+      <Word>CONFIRM</Word>
+      <Word>ASSERTERROR</Word>
+      <Word>EVENT</Word>
+      <Word>TRIGGER</Word>
+    </Keywords>
+
+    <Keywords color="Type">
+      <Word>Record</Word>
+      <Word>Codeunit</Word>
+      <Word>Page</Word>
+      <Word>Report</Word>
+      <Word>Query</Word>
+      <Word>XMLport</Word>
+      <Word>Integer</Word>
+      <Word>Decimal</Word>
+      <Word>Boolean</Word>
+      <Word>Text</Word>
+      <Word>Code</Word>
+      <Word>Date</Word>
+      <Word>Time</Word>
+      <Word>DateTime</Word>
+      <Word>Option</Word>
+      <Word>BigInteger</Word>
+      <Word>GUID</Word>
+      <Word>RecordRef</Word>
+      <Word>FieldRef</Word>
+      <Word>RecordID</Word>
+      <Word>Variant</Word>
+      <Word>TextConst</Word>
+      <Word>Char</Word>
+      <Word>Byte</Word>
+      <Word>DateFormula</Word>
+      <Word>Duration</Word>
+      <Word>BLOB</Word>
+    </Keywords>
+
+    <Rule color="Number">
+      \b0[xX][0-9a-fA-F]+  |  \b\d+(\.\d+)?
+    </Rule>
+
+  </RuleSet>
+</SyntaxDefinition>

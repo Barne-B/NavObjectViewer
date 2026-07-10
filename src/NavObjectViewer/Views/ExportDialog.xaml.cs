@@ -10,6 +10,7 @@ public partial class ExportDialog : Window
     {
         InitializeComponent();
         DataContext = new ExportViewModel(objects);
+        SourceInitialized += (_, _) => NativeTheme.ApplyTitleBarTheme(this, ThemeManager.Current == ThemeManager.Mode.Dark);
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

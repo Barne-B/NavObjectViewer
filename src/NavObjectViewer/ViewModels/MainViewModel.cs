@@ -45,6 +45,9 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Grouped search results: object nodes with lazily-loaded line children.</summary>
     public ObservableCollection<SearchNodeViewModel> SearchNodes { get; } = [];
 
+    /// <summary>Raised after a search finishes populating results, so the view can reset the results scroll.</summary>
+    public event Action? SearchCompleted;
+
     [ObservableProperty]
     private ICollectionView? _rowsView;
 
@@ -354,6 +357,7 @@ public partial class MainViewModel : ObservableObject
 
             long totalMatches = hits.Sum(h => (long)h.Count);
             SearchStatus = $"{totalMatches:N0} matches in {hits.Count:N0} object(s) — scanned {scopeList.Count:N0} object(s)";
+            SearchCompleted?.Invoke();
         }
         catch (Exception ex)
         {
