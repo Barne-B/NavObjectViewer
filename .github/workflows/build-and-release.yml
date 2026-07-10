@@ -1,0 +1,57 @@
+name: Build & Release
+
+# Build, test, and publish a self-contained Windows executable, then cut a
+# GitHub Release with the exe attached — automatically on every push to master.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Allow the built-in GITHUB_TOKEN to create tags/releases and upload assets.
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    # WPF requires the Windows Desktop targeting packs, so build on Windows.
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET (from global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore NavObjectViewer.sln
+
+      - name: Test
+        run: dotnet test tests/NavObjectViewer.Tests/NavObjectViewer.Tests.csproj -c Release --no-restore
+
+      - name: Publish (self-contained single-file win-x64)
+        run: >
+          dotnet publish src/NavObjectViewer/NavObjectViewer.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+
+      - name: Stage versioned artifact
+        shell: pwsh
+        run: |
+          $version = "v1.0.${{ github.run_number }}"
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $src = "src/NavObjectViewer/bin/Release/net8.0-windows/win-x64/publish/NavObjectViewer.exe"
+          if (-not (Test-Path $src)) { throw "Published exe not found at $src" }
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item $src "dist/NavObjectViewer-$version.exe"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$env:VERSION" "dist/NavObjectViewer-$($env:VERSION).exe" --title "NAV Object Viewer $($env:VERSION)" --notes "Automated release from master @ ${{ github.sha }} (build #${{ github.run_number }})." --target "${{ github.sha }}"
