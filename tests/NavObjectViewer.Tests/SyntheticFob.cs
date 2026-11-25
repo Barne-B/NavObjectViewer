@@ -56,13 +56,14 @@ public sealed class SyntheticFob : IDisposable
             Chunk(data, 3, blob);
         }
 
-        byte[] preambleTemplate = Preamble(0);
-        long endOffset = header.Length + 4 + 8 + preambleTemplate.Length + index.Length + data.Length;
+        byte[] preambleTemplate = Preamble(0, 0);
+        byte[] padding = Enumerable.Repeat((byte)0x1A, 4 - (int)(header.Length % 4)).ToArray();
+        long endOffset = header.Length + padding.Length + 8 + preambleTemplate.Length + index.Length + data.Length;
 
         var file = new MemoryStream();
         header.WriteTo(file);
-        file.Write([0x1A, 0x1A, 0x1A, 0x1A]);
-        Chunk(file, 0x1B01, Preamble(endOffset + TailDelta));
+        file.Write(padding);
+        Chunk(file, 0x1B01, Preamble(endOffset + TailDelta, objects.Count));
         index.WriteTo(file);
         data.WriteTo(file);
         Chunk(file, 0x1B02, []);
@@ -79,7 +80,7 @@ public sealed class SyntheticFob : IDisposable
         return file.ToArray();
     }
 
-    private static byte[] Preamble(long tailOffset)
+    private static byte[] Preamble(long tailOffset, long objectCount)
     {
         var p = new MemoryStream();
         Tlv(p, 0x1B0A, U32(0x1A41734B));
@@ -88,6 +89,7 @@ public sealed class SyntheticFob : IDisposable
         Tlv(p, 0x1B13, U32((uint)tailOffset));
         Tlv(p, 0x1B15, U32(1));
         Tlv(p, 0x1B1C, BitConverter.GetBytes(tailOffset));
+        Tlv(p, 0x1B1E, BitConverter.GetBytes(objectCount));
         Tlv(p, 0x1B1F, U32(0));
         p.Write(U32(0));
         return p.ToArray();

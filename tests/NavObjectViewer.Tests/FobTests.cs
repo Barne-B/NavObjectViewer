@@ -111,6 +111,37 @@ public class FobTests
         }
     }
 
+    [Theory]
+    [InlineData(0, 4)]
+    [InlineData(1, 3)]
+    [InlineData(2, 2)]
+    [InlineData(3, 1)]
+    public void Text_list_is_padded_to_a_4_byte_boundary(long textLength, int expectedPadding)
+        => Assert.Equal(expectedPadding, FobWriter.TextPadding(textLength).Length);
+
+    [Fact]
+    public void Every_subset_size_round_trips_with_matching_padding_and_count()
+    {
+        using var f = SyntheticFob.CreateDefault();
+        List<NavObject> objs = new ObjectIndexer().IndexFile(f.Path);
+
+        for (int n = 1; n <= objs.Count; n++)
+        {
+            string outFile = TempFob();
+            try
+            {
+                new FobWriter().Write(objs.Take(n), outFile);
+                byte[] expected = SyntheticFob.Build(SyntheticFob.DefaultObjects.Take(n).ToList());
+                Assert.Equal(expected, File.ReadAllBytes(outFile));
+                Assert.Equal(n, new ObjectIndexer().IndexFile(outFile).Count);
+            }
+            finally
+            {
+                File.Delete(outFile);
+            }
+        }
+    }
+
     [Fact]
     public void Writer_skips_text_objects_and_rejects_text_only_selections()
     {

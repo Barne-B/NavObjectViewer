@@ -16,6 +16,7 @@ public sealed class FobLayout
     public int HashChunkLength { get; init; }
     public long TrailerHeaderOffset { get; init; }
     public bool HasTrailer { get; init; }
+    public int ObjectCount { get; init; }
 }
 
 /// <summary>
@@ -24,10 +25,12 @@ public sealed class FobLayout
 /// Layout, as reverse-engineered from real files:
 /// <code>
 ///   text object list   2 CRLF lines per object (type/id/name/date/time, size/version list)
-///   1A 1A 1A 1A        end-of-text marker
+///   1A padding         1-4 bytes, so the chunks start on a 4-byte boundary
 ///   chunks             [u16 kind][u16 checksum = byte sum of payload][u32 length][payload]
-///     0x1B01           container settings (nested u16 tag/u16 length TLVs, collation tables)
-///     1 + 4            per object: Object-table record + size info (the index)
+///     0x1B01           container settings (nested u16 tag/u16 length TLVs, collation tables;
+///                      0x1B13/0x1B1C = end-of-objects offset + 10, 0x1B1E = object count)
+///     1 + 4            per object: Object-table record + size info (the index; 16 or 56 bytes,
+///                      the longer form also carries the version list)
 ///     2 + 3            per object: Object-table record + compiled object BLOB
 ///     0x1B02           end of objects (empty)
 ///     0x1B03           16-byte container id
@@ -48,7 +51,8 @@ public static partial class FobReader
     public const ushort KindEnd = 0x1B02;
     public const ushort KindContainerId = 0x1B03;
 
-    private static readonly byte[] TextEndMarker = [0x1A, 0x1A, 0x1A, 0x1A];
+    /// <summary>Pads the text object list up to the 4-byte-aligned start of the chunks.</summary>
+    public const byte TextPadding = 0x1A;
 
     [GeneratedRegex(@"^(?<type>Table|Form|Report|Dataport|Codeunit|XMLport|MenuSuite|Page|Query)\s+\d+\s", RegexOptions.IgnoreCase)]
     private static partial Regex FirstLineRegex();
@@ -82,7 +86,7 @@ public static partial class FobReader
         var reader = new BinaryReader(fs);
 
         List<(long Offset, int Length, string Line)> headers = ReadHeaderList(fs, out long binaryStart);
-        fs.Position = binaryStart + TextEndMarker.Length;
+        fs.Position = binaryStart;
         ReadChunkHeader(reader, out ushort kind, out _, out uint len);
         if (kind != KindPreamble)
             throw new InvalidDataException("Not a supported .fob file: container settings chunk is missing.");
@@ -171,7 +175,7 @@ public static partial class FobReader
         var reader = new BinaryReader(fs);
         ReadHeaderList(fs, out long binaryStart);
 
-        long preamble = binaryStart + TextEndMarker.Length;
+        long preamble = binaryStart;
         fs.Position = preamble;
         ReadChunkHeader(reader, out ushort kind, out _, out uint len);
         if (kind != KindPreamble)
@@ -179,11 +183,14 @@ public static partial class FobReader
         fs.Position += len;
         int preambleLength = (int)(fs.Position - preamble);
 
+        int objectCount = 0;
         while (true)
         {
             long chunkStart = fs.Position;
             ReadChunkHeader(reader, out kind, out _, out len);
             fs.Position += len;
+            if (kind == KindData)
+                objectCount++;
             if (kind != KindEnd)
                 continue;
 
@@ -200,6 +207,7 @@ public static partial class FobReader
                 HashChunkLength = hasHash ? (int)(8 + hashLen) : 0,
                 TrailerHeaderOffset = trailerHeader,
                 HasTrailer = trailerHeader + 16 <= fs.Length,
+                ObjectCount = objectCount,
             };
         }
     }
@@ -269,8 +277,8 @@ public static partial class FobReader
         var lines = new List<(long, int, string)>();
         var current = new List<byte>(160);
         long lineStart = 0;
-        int markerRun = 0;
         long pos = 0;
+        bool inPadding = false;
         var buffer = new byte[1 << 16];
         fs.Position = 0;
 
@@ -280,10 +288,14 @@ public static partial class FobReader
             for (int i = 0; i < read; i++, pos++)
             {
                 byte b = buffer[i];
-                markerRun = b == 0x1A ? markerRun + 1 : 0;
-                if (markerRun == TextEndMarker.Length)
+                if (b == TextPadding)
                 {
-                    binaryStart = pos - (TextEndMarker.Length - 1);
+                    inPadding = true;
+                    continue;
+                }
+                if (inPadding)
+                {
+                    binaryStart = pos;
                     return PairLines(lines);
                 }
 
@@ -297,7 +309,7 @@ public static partial class FobReader
             }
         }
 
-        throw new InvalidDataException("Not a .fob file: the end-of-text marker was not found.");
+        throw new InvalidDataException("Not a .fob file: the end of the object list was not found.");
     }
 
     // Each object occupies two lines; the first carries type/id/name/date/time.

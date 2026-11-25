@@ -11,12 +11,12 @@ namespace NavObjectViewer.Core.Services;
 /// </summary>
 public sealed class FobWriter
 {
-    private static readonly byte[] TextEndMarker = [0x1A, 0x1A, 0x1A, 0x1A];
     private static readonly byte[] EndChunk = [0x02, 0x1B, 0, 0, 0, 0, 0, 0];
 
     // Settings TLVs holding an absolute offset into the container tail.
     private const ushort TagTailOffset32 = 0x1B13;
     private const ushort TagTailOffset64 = 0x1B1C;
+    private const ushort TagObjectCount = 0x1B1E;
     private const long MaxTailDelta = 64;
 
     public ExportResult Write(IEnumerable<NavObject> objects, string outputFile,
@@ -50,12 +50,13 @@ public sealed class FobWriter
             warnings.Add($"Merged objects from {sources} .fob files; container settings were taken from '{Path.GetFileName(templatePath)}'.");
 
         long headerBytes = ordered.Sum(o => (long)o.Fob!.HeaderLength);
-        long newEndChunk = headerBytes + TextEndMarker.Length + layout.PreambleLength
+        byte[] padding = TextPadding(headerBytes);
+        long newEndChunk = headerBytes + padding.Length + layout.PreambleLength
             + ordered.Sum(o => (long)o.Fob!.IndexLength)
             + ordered.Sum(o => o.ByteLength);
 
         byte[] preamble = FobReader.ReadRange(templatePath, layout.PreambleOffset, layout.PreambleLength);
-        PatchTailOffsets(preamble, layout.EndChunkOffset, newEndChunk);
+        PatchSettings(preamble, layout.EndChunkOffset, newEndChunk, layout.ObjectCount, ordered.Count);
 
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputFile))!);
         var handles = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
@@ -65,7 +66,7 @@ public sealed class FobWriter
 
             foreach (NavObject o in ordered)
                 Copy(Source(o), o.Fob!.HeaderOffset, o.Fob.HeaderLength, output);
-            output.Write(TextEndMarker);
+            output.Write(padding);
             output.Write(preamble);
 
             foreach (NavObject o in ordered)
@@ -118,13 +119,20 @@ public sealed class FobWriter
         }
     }
 
-    /// <summary>Rewrite tail-relative offsets in the settings chunk and refresh its checksum.</summary>
+    /// <summary>C/SIDE pads the text object list with 1-4 0x1A bytes up to a 4-byte boundary.</summary>
+    public static byte[] TextPadding(long textLength)
+        => Enumerable.Repeat(FobReader.TextPadding, 4 - (int)(textLength % 4)).ToArray();
+
+    /// <summary>
+    /// Rewrite the settings that depend on the object selection (end-of-objects
+    /// offset, object count) and refresh the chunk checksum.
+    /// </summary>
     /// <remarks>
     /// The settings TLVs are not uniformly length-prefixed (tag 0x1B12 declares 7 but
-    /// carries 4 bytes), so the offset tags are located by their tag/length signature
-    /// and only rewritten when the value points just past the old end-of-objects chunk.
+    /// carries 4 bytes), so tags are located by their tag/length signature and only
+    /// rewritten when the value matches what the template file implies.
     /// </remarks>
-    internal static void PatchTailOffsets(byte[] chunk, long oldEnd, long newEnd)
+    internal static void PatchSettings(byte[] chunk, long oldEnd, long newEnd, int oldCount, int newCount)
     {
         for (int pos = 8; pos + 4 <= chunk.Length; pos++)
         {
@@ -143,6 +151,11 @@ public sealed class FobWriter
                 long v = BitConverter.ToInt64(chunk, value);
                 if (v - oldEnd is >= 0 and < MaxTailDelta)
                     BitConverter.TryWriteBytes(chunk.AsSpan(value, 8), newEnd + (v - oldEnd));
+            }
+            else if (tag == TagObjectCount && len == 8 && value + 8 <= chunk.Length
+                && BitConverter.ToInt64(chunk, value) == oldCount)
+            {
+                BitConverter.TryWriteBytes(chunk.AsSpan(value, 8), (long)newCount);
             }
         }
 
