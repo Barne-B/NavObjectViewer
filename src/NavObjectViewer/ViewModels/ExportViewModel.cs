@@ -7,13 +7,13 @@ using NavObjectViewer.Core.Services;
 
 namespace NavObjectViewer.ViewModels;
 
-public enum ExportMode { Combined, PerObject, Fob }
+public enum ExportMode { Combined, PerObject }
 
 public partial class ExportViewModel : ObservableObject
 {
     private readonly ObjectExporter _exporter = new();
-    private readonly FobWriter _fobWriter = new();
     private readonly IReadOnlyList<NavObject> _objects;
+    private readonly int _fobObjectCount;
 
     public ExportViewModel(IReadOnlyList<NavObject> objects)
     {
@@ -22,30 +22,16 @@ public partial class ExportViewModel : ObservableObject
         _fobObjectCount = objects.Count(o => o.IsFob);
     }
 
-    /// <summary>Selected objects that come from a .fob (only these can be written to a new .fob).</summary>
-    public int FobObjectCount => _fobObjectCount;
-    private readonly int _fobObjectCount;
-
-    public bool CanExportFob => _fobObjectCount > 0;
-
-    /// <summary>Hint shown when the selection contains .fob objects, or the .fob mode is chosen.</summary>
-    public string FobHint => Mode switch
-    {
-        ExportMode.Fob when _fobObjectCount < ObjectCount =>
-            $"Only the {_fobObjectCount:N0} object(s) read from a .fob can be written; {ObjectCount - _fobObjectCount:N0} text-export object(s) will be skipped (compiling text needs C/SIDE).",
-        ExportMode.Fob => "Compiled objects are copied byte-for-byte from the source .fob file(s).",
-        _ when _fobObjectCount > 0 =>
-            $"{_fobObjectCount:N0} object(s) come from a .fob: they are written as decoded code (triggers and functions only) and cannot be re-imported into C/SIDE.",
-        _ => string.Empty,
-    };
+    /// <summary>Hint shown when the selection contains objects read from a .fob.</summary>
+    public string FobHint => _fobObjectCount > 0
+        ? $"{_fobObjectCount:N0} object(s) come from a .fob: they are written as decoded code (triggers and functions only) and cannot be re-imported into C/SIDE."
+        : string.Empty;
 
     public bool HasFobHint => FobHint.Length > 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCombined))]
     [NotifyPropertyChangedFor(nameof(IsPerObject))]
-    [NotifyPropertyChangedFor(nameof(FobHint))]
-    [NotifyPropertyChangedFor(nameof(HasFobHint))]
     private ExportMode _mode = ExportMode.Combined;
 
     [ObservableProperty] private string _outputPath = string.Empty;
@@ -63,18 +49,7 @@ public partial class ExportViewModel : ObservableObject
     [RelayCommand]
     private void Browse()
     {
-        if (Mode == ExportMode.Fob)
-        {
-            var fobDlg = new SaveFileDialog
-            {
-                Title = "Save as new .fob",
-                Filter = "Binary objects (*.fob)|*.fob",
-                FileName = "NAV-Export-Selection.fob",
-            };
-            if (fobDlg.ShowDialog() == true)
-                OutputPath = fobDlg.FileName;
-        }
-        else if (IsCombined)
+        if (IsCombined)
         {
             var dlg = new SaveFileDialog
             {
@@ -120,7 +95,6 @@ public partial class ExportViewModel : ObservableObject
             ExportResult result = await Task.Run(() => mode switch
             {
                 ExportMode.Combined => _exporter.ExportCombined(_objects, path, progress),
-                ExportMode.Fob => _fobWriter.Write(_objects, path, progress),
                 _ => _exporter.ExportPerObject(_objects, path, group, progress),
             });
 

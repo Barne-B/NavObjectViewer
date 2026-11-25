@@ -6,9 +6,6 @@ namespace NavObjectViewer.Tests;
 
 public class FobTests
 {
-    private static string TempFob() =>
-        System.IO.Path.Combine(System.IO.Path.GetTempPath(), "navtest-out-" + Guid.NewGuid().ToString("N") + ".fob");
-
     [Fact]
     public void Indexes_objects_with_metadata()
     {
@@ -70,68 +67,21 @@ public class FobTests
         Assert.Equal(50000, Assert.Single(hits).Object.Id);
     }
 
-    [Fact]
-    public void Rewriting_all_objects_is_byte_identical()
+    // C/SIDE pads the object list with 1-4 0x1A bytes; name lengths 31..34 make the
+    // two header lines 163..166 bytes long, which covers every padding length.
+    [Theory]
+    [InlineData(31)]
+    [InlineData(32)]
+    [InlineData(33)]
+    [InlineData(34)]
+    public void Reads_files_with_any_padding_length(int nameLength)
     {
-        using var f = SyntheticFob.CreateDefault();
-        List<NavObject> objs = new ObjectIndexer().IndexFile(f.Path);
-        string outFile = TempFob();
-        try
-        {
-            new FobWriter().Write(objs, outFile);
-            Assert.Equal(File.ReadAllBytes(f.Path), File.ReadAllBytes(outFile));
-        }
-        finally
-        {
-            File.Delete(outFile);
-        }
-    }
+        string name = new('N', nameLength);
+        using var f = SyntheticFob.Create([new SyntheticFob.Obj(5, "Codeunit", 50010, name, false, "OnRun()\r\n  EXIT;\r\n")]);
 
-    [Fact]
-    public void Subset_fob_matches_a_fob_built_from_only_those_objects()
-    {
-        using var f = SyntheticFob.CreateDefault();
-        List<NavObject> objs = new ObjectIndexer().IndexFile(f.Path);
-        string outFile = TempFob();
-        try
-        {
-            ExportResult result = new FobWriter().Write(objs.Where(o => o.Id != 50000), outFile);
-            Assert.Equal(2, result.ObjectCount);
-
-            byte[] expected = SyntheticFob.Build(SyntheticFob.DefaultObjects.Where(o => o.Id != 50000).ToList());
-            Assert.Equal(expected, File.ReadAllBytes(outFile));
-
-            List<NavObject> reread = new ObjectIndexer().IndexFile(outFile);
-            Assert.Equal([50001, 50002], reread.Select(o => o.Id));
-            Assert.Contains("EXIT(TRUE);", ObjectReader.ReadText(reread[0]));
-        }
-        finally
-        {
-            File.Delete(outFile);
-        }
-    }
-
-    [Fact]
-    public void Writer_skips_text_objects_and_rejects_text_only_selections()
-    {
-        using var fob = SyntheticFob.CreateDefault();
-        using var txt = SyntheticExport.CreateDefault();
-        var indexer = new ObjectIndexer();
-        List<NavObject> textObjs = indexer.IndexFile(txt.Path);
-        List<NavObject> fobObjs = indexer.IndexFile(fob.Path);
-        string outFile = TempFob();
-        try
-        {
-            Assert.Throws<InvalidOperationException>(() => new FobWriter().Write(textObjs, outFile));
-
-            ExportResult result = new FobWriter().Write(fobObjs.Concat(textObjs.Take(1)), outFile);
-            Assert.Equal(3, result.ObjectCount);
-            Assert.Contains(result.Warnings, w => w.Contains("text export"));
-        }
-        finally
-        {
-            File.Delete(outFile);
-        }
+        NavObject obj = Assert.Single(new ObjectIndexer().IndexFile(f.Path));
+        Assert.Equal(name, obj.Name);
+        Assert.Contains("EXIT;", ObjectReader.ReadText(obj));
     }
 
     [Fact]
@@ -139,7 +89,7 @@ public class FobTests
     {
         using var f = SyntheticFob.CreateDefault();
         List<NavObject> objs = new ObjectIndexer().IndexFile(f.Path);
-        string outFile = System.IO.Path.ChangeExtension(TempFob(), ".txt");
+        string outFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "navtest-out-" + Guid.NewGuid().ToString("N") + ".txt");
         try
         {
             new ObjectExporter().ExportCombined(objs, outFile);

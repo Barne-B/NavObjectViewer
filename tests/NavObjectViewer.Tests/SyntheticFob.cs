@@ -32,6 +32,8 @@ public sealed class SyntheticFob : IDisposable
 
     public static SyntheticFob CreateDefault() => new(Build(DefaultObjects));
 
+    public static SyntheticFob Create(IReadOnlyList<Obj> objects) => new(Build(objects));
+
     public void Dispose()
     {
         try { File.Delete(Path); } catch { /* best effort */ }
@@ -56,13 +58,14 @@ public sealed class SyntheticFob : IDisposable
             Chunk(data, 3, blob);
         }
 
-        byte[] preambleTemplate = Preamble(0);
-        long endOffset = header.Length + 4 + 8 + preambleTemplate.Length + index.Length + data.Length;
+        byte[] preambleTemplate = Preamble(0, 0);
+        byte[] padding = Enumerable.Repeat((byte)0x1A, 4 - (int)(header.Length % 4)).ToArray();
+        long endOffset = header.Length + padding.Length + 8 + preambleTemplate.Length + index.Length + data.Length;
 
         var file = new MemoryStream();
         header.WriteTo(file);
-        file.Write([0x1A, 0x1A, 0x1A, 0x1A]);
-        Chunk(file, 0x1B01, Preamble(endOffset + TailDelta));
+        file.Write(padding);
+        Chunk(file, 0x1B01, Preamble(endOffset + TailDelta, objects.Count));
         index.WriteTo(file);
         data.WriteTo(file);
         Chunk(file, 0x1B02, []);
@@ -79,7 +82,7 @@ public sealed class SyntheticFob : IDisposable
         return file.ToArray();
     }
 
-    private static byte[] Preamble(long tailOffset)
+    private static byte[] Preamble(long tailOffset, long objectCount)
     {
         var p = new MemoryStream();
         Tlv(p, 0x1B0A, U32(0x1A41734B));
@@ -88,6 +91,7 @@ public sealed class SyntheticFob : IDisposable
         Tlv(p, 0x1B13, U32((uint)tailOffset));
         Tlv(p, 0x1B15, U32(1));
         Tlv(p, 0x1B1C, BitConverter.GetBytes(tailOffset));
+        Tlv(p, 0x1B1E, BitConverter.GetBytes(objectCount));
         Tlv(p, 0x1B1F, U32(0));
         p.Write(U32(0));
         return p.ToArray();
@@ -126,7 +130,7 @@ public sealed class SyntheticFob : IDisposable
     private static void Chunk(Stream s, ushort kind, byte[] payload)
     {
         s.Write(BitConverter.GetBytes(kind));
-        s.Write(BitConverter.GetBytes(FobWriter.Checksum(payload)));
+        s.Write(BitConverter.GetBytes(Checksum(payload)));
         s.Write(U32((uint)payload.Length));
         s.Write(payload);
     }
@@ -143,6 +147,15 @@ public sealed class SyntheticFob : IDisposable
             deflate.Write(Encoding.UTF8.GetBytes(text));
         s.Write(U32((uint)compressed.Length));
         compressed.WriteTo(s);
+    }
+
+    // Chunk checksum: byte sum of the payload, truncated to 16 bits.
+    private static ushort Checksum(byte[] payload)
+    {
+        uint sum = 0;
+        foreach (byte b in payload)
+            sum += b;
+        return (ushort)sum;
     }
 
     private static byte[] U32(uint v) => BitConverter.GetBytes(v);
