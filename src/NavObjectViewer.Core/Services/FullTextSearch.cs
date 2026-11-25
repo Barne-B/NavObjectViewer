@@ -152,6 +152,9 @@ public sealed class FullTextSearch
 
     private static string ReadObjectText(FileStream fs, NavObject obj)
     {
+        if (obj.IsFob)
+            return FobText.Build(obj);
+
         long length = obj.ByteLength;
         if (length <= 0)
             return string.Empty;

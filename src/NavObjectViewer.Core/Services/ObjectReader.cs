@@ -30,7 +30,10 @@ public static class ObjectReader
         return total == bytes.Length ? bytes : bytes[..total];
     }
 
-    /// <summary>Read an object's text decoded as CP850, for viewing.</summary>
+    /// <summary>
+    /// Read an object's text for viewing: CP850-decoded source for text exports,
+    /// or the decoded C/AL view (<see cref="FobText"/>) for .fob objects.
+    /// </summary>
     public static string ReadText(NavObject obj)
-        => Encodings.Nav.GetString(ReadBytes(obj));
+        => obj.IsFob ? FobText.Build(obj) : Encodings.Nav.GetString(ReadBytes(obj));
 }

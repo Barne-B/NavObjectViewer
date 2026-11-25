@@ -102,7 +102,8 @@ public partial class MainViewModel : ObservableObject
         {
             ViewerText = ObjectReader.ReadText(value.Model);
             ViewerHeader = $"{value.Model} — {value.Model.ByteLength:N0} bytes — {value.SourceFileName}"
-                + (value.IsAnomalous ? "  ⚠ bracketed header" : string.Empty);
+                + (value.IsAnomalous ? "  ⚠ bracketed header" : string.Empty)
+                + (value.Model.IsFob ? "  · decoded from .fob (code only, read-only)" : string.Empty);
         }
         catch (Exception ex)
         {
@@ -111,7 +112,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     // ---- Status ------------------------------------------------------------
-    [ObservableProperty] private string _statusText = "Open a C/AL export file or a folder to begin.";
+    [ObservableProperty] private string _statusText = "Open a C/AL export (.txt), a .fob file or a folder to begin.";
     [ObservableProperty] private double _progress;
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private int _totalCount;
@@ -136,8 +137,8 @@ public partial class MainViewModel : ObservableObject
     {
         var dlg = new OpenFileDialog
         {
-            Title = "Open C/AL object export",
-            Filter = "Text exports (*.txt)|*.txt|All files (*.*)|*.*",
+            Title = "Open NAV objects",
+            Filter = "NAV objects (*.txt;*.fob)|*.txt;*.fob|Text exports (*.txt)|*.txt|Binary objects (*.fob)|*.fob|All files (*.*)|*.*",
         };
         if (dlg.ShowDialog() != true)
             return;

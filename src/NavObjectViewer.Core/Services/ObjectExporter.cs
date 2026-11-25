@@ -8,6 +8,7 @@ public sealed record ExportResult(int FileCount, int ObjectCount, string OutputP
 /// Exports selected objects by copying their raw source bytes (no re-encoding), so
 /// the output re-imports into C/SIDE with byte-for-byte fidelity. Supports one
 /// combined file or one file per object grouped into per-type subfolders.
+/// Objects read from a .fob are written as their decoded code view (see <see cref="FobText"/>).
 /// </summary>
 public sealed class ObjectExporter
 {
@@ -74,7 +75,7 @@ public sealed class ObjectExporter
     // by a blank-line separator, so re-import sees cleanly delimited objects.
     private static void WriteObjectBlock(Stream outStream, NavObject obj)
     {
-        byte[] bytes = ObjectReader.ReadBytes(obj);
+        byte[] bytes = obj.IsFob ? Encodings.Nav.GetBytes(FobText.Build(obj)) : ObjectReader.ReadBytes(obj);
         int end = bytes.Length;
         while (end > 0 && (bytes[end - 1] == (byte)'\r' || bytes[end - 1] == (byte)'\n'))
             end--;

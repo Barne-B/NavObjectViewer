@@ -23,6 +23,9 @@ public sealed partial class ObjectIndexer
 
     /// <summary>Index a single export file. Reports fractional progress (0..1).</summary>
     public List<NavObject> IndexFile(string path, IProgress<double>? progress = null, CancellationToken ct = default)
+        => FobReader.IsFob(path) ? FobReader.Index(path, progress, ct) : IndexTextFile(path, progress, ct);
+
+    private List<NavObject> IndexTextFile(string path, IProgress<double>? progress, CancellationToken ct)
     {
         var results = new List<NavObject>();
         Encoding enc = Encodings.Nav;
@@ -121,12 +124,14 @@ public sealed partial class ObjectIndexer
         return results;
     }
 
-    /// <summary>Index every *.txt file in a directory (non-recursive by default).</summary>
+    /// <summary>Index every *.txt and *.fob file in a directory (non-recursive by default).</summary>
     public List<NavObject> IndexDirectory(string directory, bool recursive = false,
         IProgress<double>? progress = null, CancellationToken ct = default)
     {
         var option = recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-        string[] files = Directory.GetFiles(directory, "*.txt", option);
+        string[] files = Directory.GetFiles(directory, "*.txt", option)
+            .Concat(Directory.GetFiles(directory, "*.fob", option))
+            .ToArray();
         var all = new List<NavObject>();
         for (int f = 0; f < files.Length; f++)
         {
