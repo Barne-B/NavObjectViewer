@@ -32,6 +32,8 @@ public sealed class SyntheticFob : IDisposable
 
     public static SyntheticFob CreateDefault() => new(Build(DefaultObjects));
 
+    public static SyntheticFob Create(IReadOnlyList<Obj> objects) => new(Build(objects));
+
     public void Dispose()
     {
         try { File.Delete(Path); } catch { /* best effort */ }
@@ -128,7 +130,7 @@ public sealed class SyntheticFob : IDisposable
     private static void Chunk(Stream s, ushort kind, byte[] payload)
     {
         s.Write(BitConverter.GetBytes(kind));
-        s.Write(BitConverter.GetBytes(FobWriter.Checksum(payload)));
+        s.Write(BitConverter.GetBytes(Checksum(payload)));
         s.Write(U32((uint)payload.Length));
         s.Write(payload);
     }
@@ -145,6 +147,15 @@ public sealed class SyntheticFob : IDisposable
             deflate.Write(Encoding.UTF8.GetBytes(text));
         s.Write(U32((uint)compressed.Length));
         compressed.WriteTo(s);
+    }
+
+    // Chunk checksum: byte sum of the payload, truncated to 16 bits.
+    private static ushort Checksum(byte[] payload)
+    {
+        uint sum = 0;
+        foreach (byte b in payload)
+            sum += b;
+        return (ushort)sum;
     }
 
     private static byte[] U32(uint v) => BitConverter.GetBytes(v);

@@ -26,9 +26,8 @@ per-object files that re-import into C/SIDE byte-for-byte.
   per object (`COD80040.txt`, `TAB50000.txt`, …) grouped into per-type subfolders.
 - **Binary `.fob` files** (NAV 2013+) — opened like text exports. Each object shows its
   properties and the C/AL code of every trigger and function. The code is decoded from the
-  runtime metadata stored in the `.fob`. Selected `.fob` objects can be saved as a **new
-  `.fob`** (a subset of one file, or merged from several). Every compiled object is copied
-  byte-for-byte. They can also be exported as text, for reading and diffing.
+  runtime metadata stored in the `.fob`. Objects can be exported as text for reading and
+  diffing.
 - Robust to the real data's quirks, e.g. the bracketed header
   `OBJECT [Report 50014 … ]` (flagged with ⚠ in the grid).
 
@@ -39,7 +38,7 @@ src/NavObjectViewer.Core/   parser + exporter + search (no UI, unit-tested)
   Models/                   NavObject, NavObjectType
   Services/                 ObjectIndexer, ObjectReader, ObjectExporter,
                             FullTextSearch, IndexCache, Encodings (CP850),
-                            FobReader / FobText / FobWriter (.fob support)
+                            FobReader / FobText (.fob support)
 src/NavObjectViewer/        WPF app (MVVM), AvalonEdit viewer
 tests/NavObjectViewer.Tests xUnit tests (indexer, exporter round-trip, search, cache)
 ```
@@ -81,8 +80,10 @@ dotnet publish src/NavObjectViewer/NavObjectViewer.csproj -c Release -r win-x64 
 - **`.fob` limits:** the compiled object BLOB is an undocumented binary format. Text from a
   `.fob` therefore covers the object properties, triggers and functions (signatures and
   code). It does not include variable declarations, IDs, fields, controls or other
-  properties, so it **cannot be imported into C/SIDE**. Text cannot be turned into a
-  `.fob` either, because that needs the C/SIDE compiler (use `finsql.exe` for that).
+  properties, so it **cannot be imported into C/SIDE**.
+- **No `.fob` writing:** a `.fob` carries a 16-byte checksum that C/SIDE verifies on import
+  and that cannot be reproduced outside C/SIDE, so new `.fob` files must be exported from
+  C/SIDE (Object Designer or `finsql.exe command=exportobjects`).
 
 - The first index of a file is cached under
   `%LOCALAPPDATA%\NavObjectViewer\cache`, keyed by size + last-write time, so

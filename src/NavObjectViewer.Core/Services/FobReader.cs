@@ -5,20 +5,6 @@ using NavObjectViewer.Core.Models;
 
 namespace NavObjectViewer.Core.Services;
 
-/// <summary>Container-level ranges of a .fob file, needed to write a new one from it.</summary>
-public sealed class FobLayout
-{
-    public required string Path { get; init; }
-    public long PreambleOffset { get; init; }
-    public int PreambleLength { get; init; }
-    public long EndChunkOffset { get; init; }
-    public long HashChunkOffset { get; init; }
-    public int HashChunkLength { get; init; }
-    public long TrailerHeaderOffset { get; init; }
-    public bool HasTrailer { get; init; }
-    public int ObjectCount { get; init; }
-}
-
 /// <summary>
 /// Reads the binary C/SIDE object container (.fob, NAV 2013 and later).
 ///
@@ -33,7 +19,7 @@ public sealed class FobLayout
 ///                      the longer form also carries the version list)
 ///     2 + 3            per object: Object-table record + compiled object BLOB
 ///     0x1B02           end of objects (empty)
-///     0x1B03           16-byte container id
+///     0x1B03           16-byte checksum (keyed; not reproducible, so .fob files are read-only here)
 ///   runtime metadata   u32 magic, u32, u32, u32 count, then per object:
 ///                      u32 type, u32 id, u32 0, then 2x (u32 length + raw deflate):
 ///                      generated C# and the C/AL source used by the debugger
@@ -85,14 +71,13 @@ public static partial class FobReader
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16);
         var reader = new BinaryReader(fs);
 
-        List<(long Offset, int Length, string Line)> headers = ReadHeaderList(fs, out long binaryStart);
+        List<string> headers = ReadHeaderList(fs, out long binaryStart);
         fs.Position = binaryStart;
         ReadChunkHeader(reader, out ushort kind, out _, out uint len);
         if (kind != KindPreamble)
             throw new InvalidDataException("Not a supported .fob file: container settings chunk is missing.");
         fs.Position += len;
 
-        var index = new List<(long Offset, long End)>();
         var data = new List<(long Offset, long End, byte[] Record)>();
         while (true)
         {
@@ -106,10 +91,7 @@ public static partial class FobReader
             switch (kind)
             {
                 case KindIndexRecord:
-                    index.Add((chunkStart, next));
-                    break;
-                case KindIndexInfo when index.Count > 0:
-                    index[^1] = (index[^1].Offset, next);
+                case KindIndexInfo:
                     break;
                 case KindData:
                     data.Add((chunkStart, next, reader.ReadBytes((int)len)));
@@ -135,7 +117,7 @@ public static partial class FobReader
         for (int i = 0; i < data.Count; i++)
         {
             ObjectRecord rec = ObjectRecord.Parse(data[i].Record);
-            string headerLine = i < headers.Count ? headers[i].Line : string.Empty;
+            string headerLine = i < headers.Count ? headers[i] : string.Empty;
             Match dt = DateTimeRegex().Match(headerLine);
 
             trailer.TryGetValue((rec.Type, rec.Id), out var meta);
@@ -153,10 +135,6 @@ public static partial class FobReader
                 Time = dt.Success ? dt.Groups["time"].Value : rec.FormatTime(),
                 Fob = new FobEntry
                 {
-                    HeaderOffset = i < headers.Count ? headers[i].Offset : 0,
-                    HeaderLength = i < headers.Count ? headers[i].Length : 0,
-                    IndexOffset = i < index.Count ? index[i].Offset : 0,
-                    IndexLength = i < index.Count ? (int)(index[i].End - index[i].Offset) : 0,
                     TrailerOffset = meta.Offset,
                     TrailerLength = meta.Length,
                     Compiled = rec.Compiled,
@@ -166,50 +144,6 @@ public static partial class FobReader
 
         progress?.Report(1.0);
         return results;
-    }
-
-    /// <summary>Locate the container-level parts of a .fob (used as the template when writing).</summary>
-    public static FobLayout ReadLayout(string path)
-    {
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16);
-        var reader = new BinaryReader(fs);
-        ReadHeaderList(fs, out long binaryStart);
-
-        long preamble = binaryStart;
-        fs.Position = preamble;
-        ReadChunkHeader(reader, out ushort kind, out _, out uint len);
-        if (kind != KindPreamble)
-            throw new InvalidDataException("Not a supported .fob file: container settings chunk is missing.");
-        fs.Position += len;
-        int preambleLength = (int)(fs.Position - preamble);
-
-        int objectCount = 0;
-        while (true)
-        {
-            long chunkStart = fs.Position;
-            ReadChunkHeader(reader, out kind, out _, out len);
-            fs.Position += len;
-            if (kind == KindData)
-                objectCount++;
-            if (kind != KindEnd)
-                continue;
-
-            long hashStart = fs.Position;
-            bool hasHash = TryPeekChunk(reader, KindContainerId, out uint hashLen);
-            long trailerHeader = hasHash ? hashStart + 8 + hashLen : hashStart;
-            return new FobLayout
-            {
-                Path = path,
-                PreambleOffset = preamble,
-                PreambleLength = preambleLength,
-                EndChunkOffset = chunkStart,
-                HashChunkOffset = hashStart,
-                HashChunkLength = hasHash ? (int)(8 + hashLen) : 0,
-                TrailerHeaderOffset = trailerHeader,
-                HasTrailer = trailerHeader + 16 <= fs.Length,
-                ObjectCount = objectCount,
-            };
-        }
     }
 
     /// <summary>The object's C/AL source (triggers and functions with bodies), or null when not stored.</summary>
@@ -240,7 +174,7 @@ public static partial class FobReader
         return null;
     }
 
-    internal static byte[] ReadRange(string path, long offset, int length)
+    private static byte[] ReadRange(string path, long offset, int length)
     {
         var bytes = new byte[length];
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -272,11 +206,10 @@ public static partial class FobReader
         }
     }
 
-    private static List<(long Offset, int Length, string Line)> ReadHeaderList(FileStream fs, out long binaryStart)
+    private static List<string> ReadHeaderList(FileStream fs, out long binaryStart)
     {
-        var lines = new List<(long, int, string)>();
+        var lines = new List<string>();
         var current = new List<byte>(160);
-        long lineStart = 0;
         long pos = 0;
         bool inPadding = false;
         var buffer = new byte[1 << 16];
@@ -303,9 +236,8 @@ public static partial class FobReader
                 if (b != (byte)'\n')
                     continue;
 
-                lines.Add((lineStart, current.Count, Encodings.Nav.GetString(current.ToArray()).TrimEnd('\r', '\n')));
+                lines.Add(Encodings.Nav.GetString(current.ToArray()).TrimEnd('\r', '\n'));
                 current.Clear();
-                lineStart = pos + 1;
             }
         }
 
@@ -313,12 +245,12 @@ public static partial class FobReader
     }
 
     // Each object occupies two lines; the first carries type/id/name/date/time.
-    private static List<(long Offset, int Length, string Line)> PairLines(List<(long Offset, int Length, string Line)> lines)
+    private static List<string> PairLines(List<string> lines)
     {
-        var pairs = new List<(long, int, string)>(lines.Count / 2);
+        var firstLines = new List<string>(lines.Count / 2);
         for (int i = 0; i + 1 < lines.Count; i += 2)
-            pairs.Add((lines[i].Offset, lines[i].Length + lines[i + 1].Length, lines[i].Line));
-        return pairs;
+            firstLines.Add(lines[i]);
+        return firstLines;
     }
 
     private static Dictionary<(int, int), (long, int)> ReadTrailer(FileStream fs, BinaryReader reader)
@@ -385,21 +317,6 @@ public static partial class FobReader
         8 => NavObjectType.Page,
         9 => NavObjectType.Query,
         _ => NavObjectType.Unknown,
-    };
-
-    /// <summary>Sort key matching the order C/SIDE writes objects in (by NAV type number).</summary>
-    public static int NavTypeNumber(NavObjectType type) => type switch
-    {
-        NavObjectType.Table => 1,
-        NavObjectType.Form => 2,
-        NavObjectType.Report => 3,
-        NavObjectType.Dataport => 4,
-        NavObjectType.Codeunit => 5,
-        NavObjectType.XMLport => 6,
-        NavObjectType.MenuSuite => 7,
-        NavObjectType.Page => 8,
-        NavObjectType.Query => 9,
-        _ => 99,
     };
 
     /// <summary>
