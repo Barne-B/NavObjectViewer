@@ -24,6 +24,11 @@ per-object files that re-import into C/SIDE byte-for-byte.
   the left to just the objects a search found, so you can then select/export them.
 - **Export** ticked objects as a single combined `.txt`, or one `<Prefix><Id>.txt`
   per object (`COD80040.txt`, `TAB50000.txt`, …) grouped into per-type subfolders.
+- **Binary `.fob` files** (NAV 2013+) — opened like text exports. Each object shows its
+  properties and the C/AL code of every trigger and function. The code is decoded from the
+  runtime metadata stored in the `.fob`. Selected `.fob` objects can be saved as a **new
+  `.fob`** (a subset of one file, or merged from several). Every compiled object is copied
+  byte-for-byte. They can also be exported as text, for reading and diffing.
 - Robust to the real data's quirks, e.g. the bracketed header
   `OBJECT [Report 50014 … ]` (flagged with ⚠ in the grid).
 
@@ -33,7 +38,8 @@ per-object files that re-import into C/SIDE byte-for-byte.
 src/NavObjectViewer.Core/   parser + exporter + search (no UI, unit-tested)
   Models/                   NavObject, NavObjectType
   Services/                 ObjectIndexer, ObjectReader, ObjectExporter,
-                            FullTextSearch, IndexCache, Encodings (CP850)
+                            FullTextSearch, IndexCache, Encodings (CP850),
+                            FobReader / FobText / FobWriter (.fob support)
 src/NavObjectViewer/        WPF app (MVVM), AvalonEdit viewer
 tests/NavObjectViewer.Tests xUnit tests (indexer, exporter round-trip, search, cache)
 ```
@@ -71,6 +77,12 @@ dotnet publish src/NavObjectViewer/NavObjectViewer.csproj -c Release -r win-x64 
 ```
 
 ## Notes
+
+- **`.fob` limits:** the compiled object BLOB is an undocumented binary format. Text from a
+  `.fob` therefore covers the object properties, triggers and functions (signatures and
+  code). It does not include variable declarations, IDs, fields, controls or other
+  properties, so it **cannot be imported into C/SIDE**. Text cannot be turned into a
+  `.fob` either, because that needs the C/SIDE compiler (use `finsql.exe` for that).
 
 - The first index of a file is cached under
   `%LOCALAPPDATA%\NavObjectViewer\cache`, keyed by size + last-write time, so

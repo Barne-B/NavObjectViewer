@@ -13,7 +13,7 @@ namespace NavObjectViewer.Core.Services;
 /// </summary>
 public static class IndexCache
 {
-    private const int FormatVersion = 1;
+    private const int FormatVersion = 2;
 
     // NOTE: do NOT ignore default values here — the first object in every export has
     // StartOffset == 0, and omitting it would make deserialization fail the `required`

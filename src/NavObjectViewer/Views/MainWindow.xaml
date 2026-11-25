@@ -207,7 +207,7 @@
                                        FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"
                                        HorizontalAlignment="Center" Margin="0,18,0,6" />
                             <TextBlock TextAlignment="Center" TextWrapping="Wrap" Foreground="{DynamicResource TextSecondary}"
-                                       Text="Open a C/AL object export (.txt) or a folder of exports to browse, search and re-export objects." />
+                                       Text="Open a C/AL object export (.txt), a binary object file (.fob) or a folder of them to browse, search and re-export objects." />
                             <Button Style="{StaticResource PrimaryButton}" Command="{Binding OpenFileCommand}"
                                     HorizontalAlignment="Center" Margin="0,18,0,0" Padding="16,9">
                                 <StackPanel Orientation="Horizontal">

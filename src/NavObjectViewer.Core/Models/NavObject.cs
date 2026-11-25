@@ -31,6 +31,12 @@ public sealed class NavObject
     /// <summary>True when the header used the unusual bracketed form: OBJECT [Type Id Name ].</summary>
     public bool IsAnomalous { get; set; }
 
+    /// <summary>Binary-container layout when the object was indexed from a .fob file; null for text exports.</summary>
+    public FobEntry? Fob { get; set; }
+
+    [JsonIgnore]
+    public bool IsFob => Fob is not null;
+
     [JsonIgnore]
     public long ByteLength => EndOffset - StartOffset;
 
